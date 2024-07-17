@@ -4,11 +4,11 @@
 
 ## 环境搭建
 
-1. 使用gnome-boxes安装Ubuntu20.04 LTS![](/home/shinka/.config/marktext/images/2024-07-17-17-03-51-image.png)
+1. 使用gnome-boxes安装Ubuntu20.04 LTS![](images/2024-07-17-21-18-08-2024-07-17-17-03-51-image.png)
 
 2. 运行```sudo apt-get install git build-essential gdb-multiarch qemu-system-misc gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu```安装需要的包
 
-3. 运行```qemu-system-riscv64 --version```和```riscv64-linux-gnu-gcc --version```检测环境是否安装成功![](/home/shinka/.config/marktext/images/2024-07-17-17-08-36-image.png)![](/home/shinka/.config/marktext/images/2024-07-17-17-09-04-image.png)
+3. 运行```qemu-system-riscv64 --version```和```riscv64-linux-gnu-gcc --version```检测环境是否安装成功![](images/2024-07-17-21-18-56-2024-07-17-17-08-36-image.png)![](images/2024-07-17-21-19-06-2024-07-17-17-09-04-image.png)
 
 ---
 
@@ -36,11 +36,11 @@
 
 2. 试运行```make qemu```
    
-   ![](/home/shinka/.config/marktext/images/2024-07-17-17-28-54-image.png)
+   ![](images/2024-07-17-21-20-14-2024-07-17-17-28-54-image.png)
 
 3. 测试```ls```命令
    
-   ![](/home/shinka/.config/marktext/images/2024-07-17-17-30-05-image.png)
+   ![](images/2024-07-17-21-19-39-2024-07-17-17-30-05-image.png)
 
 #### 实验中遇到的问题和解决方法
 
@@ -98,7 +98,7 @@
    
    用过autoi将参数转为int型
 
-3. 测试![](/home/shinka/.config/marktext/images/2024-07-17-18-19-45-image.png)
+3. 测试![](images/2024-07-17-21-20-28-2024-07-17-18-19-45-image.png)
 
 #### 实验中遇到的问题和解决方法
 
@@ -177,7 +177,7 @@
     }
    ```
 
-5. 测试结果![](/home/shinka/.config/marktext/images/2024-07-17-18-35-37-image.png)
+5. 测试结果![](images/2024-07-17-21-20-42-2024-07-17-18-35-37-image.png)
 
 #### 实验中遇到的问题和解决方法
 
@@ -281,7 +281,7 @@
 
 4. 测试结果
    
-   ![](/home/shinka/.config/marktext/images/2024-07-17-19-32-49-image.png)
+   ![](images/2024-07-17-21-21-01-2024-07-17-19-32-49-image.png)
 
 #### 实验中遇到的问题和解决方法
 
@@ -369,7 +369,7 @@
 
 4. 测试结果
    
-   ![](/home/shinka/.config/marktext/images/2024-07-17-20-32-44-image.png)
+   ![](images/2024-07-17-21-21-10-2024-07-17-20-32-44-image.png)
 
 #### 实验中遇到的问题和解决方法
 
@@ -454,7 +454,7 @@
    }
    ```
 
-2. 测试结果![](/home/shinka/.config/marktext/images/2024-07-17-20-40-41-image.png)
+2. 测试结果![](images/2024-07-17-21-21-19-2024-07-17-20-40-41-image.png)
 
 #### 实验中遇到的问题和解决方法
 
