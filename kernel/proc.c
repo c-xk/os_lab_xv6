@@ -655,3 +655,20 @@ procdump(void)
     printf("\n");
   }
 }
+
+//lab 2.2
+uint64 
+getnproc(void)
+{
+  uint64 num;
+  struct proc *np;
+
+  for (num = 0, np = proc; np < &proc[NPROC]; ++np)
+  {
+    if (np->state != UNUSED)
+    {
+      ++num;
+    }
+  }
+  return num;
+}

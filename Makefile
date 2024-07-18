@@ -194,7 +194,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_trace\
-	#lab 2.1
+	$U/_sysinfotest\
 
 
 
