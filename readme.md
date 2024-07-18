@@ -323,25 +323,11 @@
        struct dirent de;
        struct stat st;
        if ((fd = open(path, 0)) < 0)//打开文件
-       {
-           fprintf(2, "find: cannot open %s\n", path);
-           return;
-       }
-       if (fstat(fd, &st) < 0)//读取stat
-       {
-           fprintf(2, "find: cannot stat %s\n", path);
-           close(fd);
-           return;
-       }
+         ...
+       if (fstat(fd, &st) < 0)
+         ...//读取stat
        if (st.type == T_FILE)//如果是文件进行匹配
-       {
-           if (match(path, name))//匹配函数，未展示
-           {
-               printf("%s\n", path);
-           }
-           close(fd);
-           return;
-       }
+         ...//匹配操作
        if (st.type == T_DIR)//如果是文件夹，检查目录
        {
            if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf))
@@ -397,10 +383,6 @@
    ```c
    int main(int argc, char *argv[])
    {
-       char buf[128];
-       char *new_argv[MAXARG];
-       // 检查参数个数是否超过了限制
-       if (argc > MAXARG)
        ...
        // 把argv的内容拷贝到new_argv
        for (int i = 1; i < argc; i++)
@@ -408,43 +390,12 @@
        // 循环读取用户的输入
        while (gets(buf, sizeof(buf)))
        {
-           int buf_len = strlen(buf);
-           if (buf_len < 1)
-               break;
-           buf[buf_len - 1] = '\0'; 
-      // 将读取到的字符串中的换行符替换为字符串结束符
-           int argv_len = argc - 1;
-           // 拆分输入字符串并填充到new_argv
-           char *p = buf;
-           while (*p)
-           {
-               // 跳过连续的空格字符
-               while (*p && *p == ' ')
-                   p++;
-               if (*p)
-               {
-                   // 检查参数个数是否超过了限制
-                   if (argv_len >= MAXARG - 1)
-                   {
-                       printf("Too many arguments\n");
-                       exit(1);
-                   }
-                   new_argv[argv_len++] = p;
-                   // 跳过当前参数剩余字符
-                   while (*p && *p != ' ')
-                       p++;
-                   // 添加字符串结束符
-                   if (*p)
-                       *p++ = '\0';
-               }
-           }
-           // 终止字符串
-           new_argv[argv_len] = 0;
+           ... //拆分参数
            // 创建子进程并执行新程序
            if (fork() == 0)
            {
                exec(new_argv[0], new_argv);
-               exit(0);  // 如果exec失败，子进程需要退出
+               exit(0);  
            }
            //父进程进入下一次循环，与子进程同时进行，实现并发
        }
@@ -465,3 +416,167 @@
 1. 了解了xargs的使用方法与作用，对Unix-like系统的使用有了更深的理解
 
 2. 学习了多进程的进阶使用方法，子进程不一定要与父进程执行同一个程序，子进程也可以是另一个程序的入口。通过这种方法，不仅可以极大提高并发执行效率，而且子进程之间彼此互不干涉，只要父进程不崩溃，子进程的故障不会影响全局。
+
+---
+
+## Lab 2: system calls
+
+### System call tracing
+
+#### 实验目的
+
+1. 学习用户调用系统内核的过程
+
+2. 学习追踪系统内核的调用
+
+3. 学习Unix-like系统中trace的用法
+
+#### 实验过程
+
+1. 在 Makefile 的 `UPROGS` 中添加 `$U/_trace`
+
+2. 在 `user/user.h`中添加 trace 系统调用原型
+   
+   ```c
+   int trace(int);
+   ```
+
+3. 在 `user/usys.pl` 脚本中添加 trace 对应的 entry
+   
+   ```c
+   entry("trace");
+   ```
+
+4. 在 `kernel/syscall.h` 中添加 trace 的系统调用号
+   
+   ```c
+   #define SYS_trace 22
+   ```
+
+5. 实现trace的系统调用函数
+   
+   在`kernel/syscall.h`中为结构体proc添加成员`int tracemask`，在`kernel/sysproc.c`中实现trace系统函数
+   
+   ```c
+   uint64
+   sys_trace(void) {
+       int mask;
+       if (argint(0, &mask) < 0) {
+           return -1;
+       }
+       myproc()->tracemask = mask;
+       return 0;
+   }
+   ```
+
+6. 修改 `fork()` 函数，将父进程的跟踪掩码复制到子进程。
+   
+   ```c
+   np->tracemask = p->tracemask;
+   ```
+
+7. 修改`kernel/syscall.c`文件。
+   
+   - 添加 `sys_trace()` 的外部声明
+     
+     ```c
+     extern uint64 sys_trace(void);
+     ```
+   
+   - 添加 `syscalls` 函数指针的对应关系
+     
+     ```c
+     static uint64 (*syscalls[])(void) = {    
+       ...    
+       [SYS_trace] sys_trace,
+     };
+     ```
+   
+   - 新建`syscalls_name`数组来映射系统调用名
+     
+     ```c
+     static const char *syscalls_name[] = 
+     {
+       [SYS_fork]    "fork",
+       [SYS_exit]    "exit",
+       ...
+     }
+     ```
+   
+   - 修改`syscall()`以跟踪输出
+     
+     ```c
+         if ((1 << num) & p->tracemask)  //lab 2.1
+           printf("%d: syscall %s -> %d\n", p->pid, syscalls_name[num],p->trapframe->a0);
+     ```
+
+8. 测试结果
+   
+   ![](images/2024-07-18-13-35-47-image.png)
+
+#### 实验中遇到的问题和解决方法
+
+- 在实验中遇到了make不通过的情况![](images/2024-07-18-15-59-46-image.png)
+  
+  后来发现在makefile中`\`是续行符，其末尾不能有空格或制表符
+
+- 实验中对Unix-like系统的内核调用机制不了解，在阅读了资料以后才明白trace的过程
+
+#### 实验心得
+
+完整的内核调用过程如下
+
+1. 在`user/user.h`中是系统调用的接口，用户对内核的访问必须通过其中的接口
+
+2. 接口函数由perl脚本文件`usys.pl`实现，它会自动生成`usys.S`文件
+   
+   ```perl
+   sub entry {
+       my $name = shift;
+       print ".global $name\n";
+       print "${name}:\n";
+       print " li a7, SYS_${name}\n";
+       print " ecall\n";
+       print " ret\n";
+   }
+   ```
+   
+   在entry中将系统调用号写入a7寄存器，执行ecall指令，系统由用户态陷入内核态
+
+3.  `usertrap`进入内核态：
+   
+   `ecall` 指令会触发一次用户态的陷阱（trap），从而切换到内核态。陷阱处理从 `uservec` 开始。`uservec` 会保存一些用户态的寄存器值并跳转到 `usertrap`。
+
+4. `usertrap`处理trap：
+   
+   `usertrap` 检查陷阱的原因。如果是系统调用，则会处理该系统调用。在处理系统调用之前，内核会保存用户态的上下文，以便在返回用户态时恢复。`usertrap` 调用 `syscall` 函数来处理系统调用。
+
+5. `syscall`内核调用：
+   
+   `syscall` 从陷阱帧中读取系统调用号和参数。根据系统调用号，`syscall` 调用相应的系统调用处理函数。例如，`sys_trace`。系统调用处理函数执行相应的操作，然后将结果返回给 `syscall`。
+
+6. `usertrapret`恢复用户上下文：
+   
+   系统调用处理完毕后，`usertrap` 会检查是否有必要终止进程或切换进程。如果需要返回用户态，`usertrap` 调用 `usertrapret`。`usertrapret`准备恢复用户态的上下文，并最终跳转到`userret`。
+
+7. `userret`回到用户态：
+   
+   `userret` 从陷阱帧中恢复用户态的寄存器值。最后，`userret` 使用 `sret` 指令返回到用户态。
+
+在内核调用的过程中，用户无法直接向内核传递参数，而是写入用户寄存器中，系统函数通过特定函数读取用户空间的寄存器
+
+### Sysinfo
+
+#### 实验目的
+
+#### 实验过程
+
+1. 测试结果
+
+2. 测试结果
+   
+   ![](images/2024-07-18-21-10-19-image.png)
+
+#### 实验中遇到的问题和解决方法
+
+#### 实验心得
