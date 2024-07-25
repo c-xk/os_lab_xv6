@@ -318,10 +318,7 @@
    ```c
    void find(const char *path, const char *name)
    {
-       char buf[BUF_SIZE], *p;
-       int fd;
-       struct dirent de;
-       struct stat st;
+       ...
        if ((fd = open(path, 0)) < 0)//打开文件
          ...
        if (fstat(fd, &st) < 0)
@@ -330,12 +327,7 @@
          ...//匹配操作
        if (st.type == T_DIR)//如果是文件夹，检查目录
        {
-           if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf))
-           {
-               printf("find: path too long\n");
-               close(fd);
-               return;
-           }
+           ...//检查路径长度
            strcpy(buf, path);
            p = buf + strlen(buf);
            *p++ = '/';
@@ -346,7 +338,7 @@
        //inum为0表示文件不存在或为空，'.'表示当前目录，'..'表示父目录
                memmove(p, de.name, DIRSIZ);
                p[DIRSIZ] = 0;
-               find(buf, name);//递归查询
+               find(buf, name);//递归查询下一层目录
            }
        }
        close(fd);
@@ -384,23 +376,18 @@
    int main(int argc, char *argv[])
    {
        ...
-       // 把argv的内容拷贝到new_argv
-       for (int i = 1; i < argc; i++)
+       for (int i = 1; i < argc; i++)// 把argv的内容拷贝到new_argv
            new_argv[i - 1] = argv[i];
-       // 循环读取用户的输入
-       while (gets(buf, sizeof(buf)))
+       while (gets(buf, sizeof(buf)))// 循环读取用户的输入
        {
            ... //拆分参数
-           // 创建子进程并执行新程序
-           if (fork() == 0)
+           if (fork() == 0)// 创建子进程并执行新程序
            {
                exec(new_argv[0], new_argv);
                exit(0);  
-           }
-           //父进程进入下一次循环，与子进程同时进行，实现并发
+           }//父进程进入下一次循环，与子进程同时进行，实现并发
        }
-       while (wait(0) > 0)
-           ;        //父进程等待所有子进程退出后再退出
+       while (wait(0) > 0);//父进程等待所有子进程退出后再退出
        exit(0);
    }
    ```
@@ -461,9 +448,8 @@
    uint64
    sys_trace(void) {
        int mask;
-       if (argint(0, &mask) < 0) {
+       if (argint(0, &mask) < 0)
            return -1;
-       }
        myproc()->tracemask = mask;
        return 0;
    }
@@ -543,7 +529,7 @@
    
    在entry中将系统调用号写入a7寄存器，执行ecall指令，系统由用户态陷入内核态
 
-3.  `usertrap`进入内核态：
+3. `usertrap`进入内核态：
    
    `ecall` 指令会触发一次用户态的陷阱（trap），从而切换到内核态。陷阱处理从 `uservec` 开始。`uservec` 会保存一些用户态的寄存器值并跳转到 `usertrap`。
 
@@ -569,14 +555,177 @@
 
 #### 实验目的
 
+1. 学习查看与调用系统信息
+
+2. 学习初步的内存访问操作
+
+3. 学习读取系统的进程数
+
 #### 实验过程
 
-1. 测试结果
+1. 添加系统调用（与trace实验相同）
+   
+   - 在 Makefile 的 `UPROGS` 中添加 `$U/_trace`
+   
+   - 添加`user/user.h`中的系统调用原型
+   
+   - 添加entry
+   
+   - 分配系统调用号
 
-2. 测试结果
+2. 实现辅助函数
+   
+   - 在 `kernel/kalloc.c` 中查看内存用量
+     
+     ```c
+     uint64 
+     getfreemem(void) {
+         uint64 n;
+         struct run *r;// freelist中维护空闲页表数
+         for (n = 0, r = kmem.freelist; r; r = r->next)
+             ++n;
+         return n * PGSIZE;//空闲页表数*页表大小即空闲内存大小
+     }
+     ```
+   
+   - 在 `kernel/proc.c` 中查看进程数
+     
+     ```c
+     uint64 
+     getnproc(void)
+     {
+       for (num = 0, np = proc; np < &proc[NPROC]; ++np)
+         if (np->state != UNUSED)
+           ++num;  //进程数计数
+       return num;
+     }
+     ```
+   
+   - 在 `kernel/defs.h` 中添加对应的函数原型
+
+3. 实现系统调用
+   
+   ```c
+   uint64
+   sys_sysinfo(void)
+   {
+     ...
+     info.freemem = getfreemem();
+     info.nproc = getnproc();
+     if(copyout(myproc()->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+       return -1;
+     return 0;
+   }
+   ```
+
+4. 测试结果
    
    ![](images/2024-07-18-21-10-19-image.png)
 
 #### 实验中遇到的问题和解决方法
 
+- 在本实验中，我们仍然和上一个实验一样需要新建系统调用，需要在多个文件中进行修改，如果不熟悉系统调用的过程中可能会出现许多编译错误。通过阅读编译错误返回的信息，最终成功实现了实验的要求
+
+- 在本实验中，我们需要对系统的内存与进程的结构进行一定的了解，并学习对他们的访问和计算。
+
 #### 实验心得
+
+通过本次实验，我初步了解了xv6系统中对系统信息的读取。尤其是对内存页表的访问和计算，这为之后对内存部分的学习打下了初步的基础。
+
+---
+
+## Lab 3: Page tables
+
+### Speed up system calls
+
+#### 实验目的
+
+1. 学习在内核与用户之间创建共享只读内存
+
+2. 学习优化加速系统调用
+
+3. 初步学习内存的分配、初始化、映射和释放
+
+#### 实验过程
+
+1. 在`kernel/proc.h`中的`proc`结构体中增加共享页面的指针定义
+   
+   ```c
+   struct usyscall *usyscallpage;
+   ```
+
+2. 在`kernel/proc.c`的`allocproc`实现共享内存的分配与初始化
+   
+   ```c
+   if ((p->usyscallpage = (struct usyscall *)kalloc()) == 0) {
+     freeproc(p);
+     release(&p->lock);
+     return 0;
+   }//页面分配，如果失败则释放并返回0
+   p->usyscallpage->pid = p->pid;//将系统调用得到的pid存在共享页中
+   ```
+
+3. 在`kernel/proc.c`的`proc_pagetable`，将内存映射到用户空间，设置为只读模式
+   
+   ```c
+   if(mappages(pagetable, USYSCALL, PGSIZE, (uint64)(p->usyscallpage), PTE_R | PTE_U) < 0) {
+     uvmfree(pagetable, 0);
+     return 0;
+   }
+   ```
+
+4. 在`kernel/proc.c`的`proc_freepagetable`中取消这一映射
+   
+   ```c
+   uvmunmap(pagetable, USYSCALL, 1, 0);
+   ```
+
+5. 在`kernel/proc.c`的`freeproc`中增加释放共享页面的处理
+   
+   ```c
+   if(p->usyscallpage)
+     kfree((void *)p->usyscallpage);
+   p->usyscallpage = 0;
+   ```
+
+6. 测试结果![](images/2024-07-20-14-06-24-image.png)
+
+#### 实验中遇到的问题和解决方法
+
+1. 在实验时，在内存分配以后没有将pid正确写入页面中，导致返回值与正常的pid不匹配，经过测试以后修复了这一错误![](images/2024-07-20-14-14-00-image.png)
+
+2. 在实验的过程中，对Unix-like系统中内存的管理不熟悉，通过阅读相关资料理解了这一过程
+
+#### 实验心得
+
+1. 在xv6中，每次系统调用都会触发中断，陷入内核态，对于一些会重复进行的简单系统调用中，这一过程会增加许多系统开销。以本实验的getpid为例，在进程被创建的时候，创建了一个用户只读页面，并向其中写入pid。用户在getpid时只需读取这一页面即可获取到pid，而无须中断系统。
+
+2. 通过本实验，我学会的对Unix-like系统中内存页的“分配-映射-取消映射-释放”过程，学习了基本的内存页管理
+
+3. 通过本实验，我学习了优化与加速系统调用的基本方法，对系统底层的管理与加速有了更深入的理解。
+
+### Print a page table
+
+#### 实验目的
+
+进一步理解xv6中页表的组织结构
+
+#### 实验过程
+
+1. 在 `kernel/defs.h` 中声明`vmprint` 
+
+2. 在 `kernel/vm.c` 中实现函数 `vmprint`，对页表进行递归访问并打印页表。
+
+3. 在 `exec.c` 的 `exec()` 函数中添加`vmprint`的入口
+
+4. 测试结果
+   
+   ![](images/2024-07-20-14-41-57-image.png)
+
+#### 实验中遇到的问题和解决方法
+
+对页表结构的理解不够深入，在递归打印的设计上有困难。在参考了`freewalk`函数的设计之后完成实验。
+
+#### 实验心得
+
+通过本实验，我对xv6系统的页表结构有了更进一步的认识。
